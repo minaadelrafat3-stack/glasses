@@ -3,23 +3,30 @@
  *
  * These types describe the core entities of the store. They are framework
  * agnostic and shared across the service layer, state stores, and UI.
+ * Money values are integer cents (e.g. 18900 = $189.00) to avoid
+ * floating-point rounding issues.
  */
 
 export type UUID = string;
 
 export type ISODateString = string;
 
+/** Integer cents. */
 export type Money = number;
+
+export type UserRole = 'customer' | 'admin' | 'staff';
 
 export type FrameShape = 'round' | 'square' | 'rectangular' | 'oval' | 'cat-eye' | 'aviator' | 'geometric';
 
-export type FrameMaterial = 'acetate' | 'metal' | 'titanium' | 'wood' | 'mixed';
+export type FrameMaterial = 'acetate' | 'metal' | 'titanium' | 'mixed';
 
 export type GenderTarget = 'unisex' | 'men' | 'women';
 
 export type LensType = 'single-vision' | 'progressive' | 'reading' | 'non-prescription' | 'sunglasses';
 
 export type ProductStatus = 'active' | 'draft' | 'archived';
+
+export type ModerationStatus = 'pending' | 'approved' | 'rejected';
 
 export interface ProductImage {
   id: UUID;
@@ -35,13 +42,13 @@ export interface ProductImage {
 export interface ProductVariant {
   id: UUID;
   productId: UUID;
-  /** e.g. "Mat Black / 52mm" */
+  colorId: UUID | null;
+  sizeId: UUID | null;
+  /** e.g. "Matte Black / 52mm" */
   name: string;
-  /** Frame size in mm, when applicable. */
-  sizeMm: number | null;
   /** Lens tint for sunglasses, null for clear. */
   lensTint: string | null;
-  price: Money;
+  priceCents: Money;
   /** Units available across all warehouses. */
   stock: number;
   sku: string;
@@ -51,22 +58,25 @@ export interface Product {
   id: UUID;
   slug: string;
   name: string;
-  brand: string;
-  description: string;
-  shape: FrameShape;
-  material: FrameMaterial;
+  brandId: UUID | null;
+  brandName: string | null;
+  description: string | null;
+  shapeId: UUID | null;
+  shape: FrameShape | null;
+  materialId: UUID | null;
+  material: FrameMaterial | null;
   gender: GenderTarget;
   lensType: LensType;
-  /** Base price in major currency units (USD). */
-  price: Money;
+  /** Base price in cents. */
+  priceCents: Money;
   /** Compare-at price for sale display, null when not on sale. */
-  compareAtPrice: Money | null;
+  compareAtPriceCents: Money | null;
   status: ProductStatus;
   /** Average rating 0–5, null before any reviews. */
   rating: number | null;
   reviewCount: number;
   /** Category slugs this product belongs to. */
-  categoryIds: UUID[];
+  categorySlugs: string[];
   images: ProductImage[];
   variants: ProductVariant[];
   createdAt: ISODateString;
@@ -81,16 +91,50 @@ export interface Category {
   parentId: UUID | null;
 }
 
+export interface Brand {
+  id: UUID;
+  slug: string;
+  name: string;
+  description: string | null;
+}
+
+export interface Color {
+  id: UUID;
+  slug: string;
+  name: string;
+  hexCode: string | null;
+}
+
+export interface FrameShapeOption {
+  id: UUID;
+  slug: string;
+  name: string;
+}
+
+export interface MaterialOption {
+  id: UUID;
+  slug: string;
+  name: string;
+}
+
+export interface SizeOption {
+  id: UUID;
+  sizeMm: number;
+  label: string;
+}
+
 export interface Review {
   id: UUID;
   productId: UUID;
+  userId: UUID;
   authorName: string;
   rating: number;
   title: string;
   body: string;
-  createdAt: ISODateString;
-  /** True when the reviewer purchased through Vuera. */
   verifiedPurchase: boolean;
+  moderationStatus: ModerationStatus;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
 }
 
 export interface CartItem {
@@ -98,14 +142,14 @@ export interface CartItem {
   variantId: UUID;
   name: string;
   image: string;
-  unitPrice: Money;
+  unitPriceCents: Money;
   quantity: number;
 }
 
 export interface Cart {
   items: CartItem[];
-  /** Subtotal before tax and shipping. */
-  subtotal: Money;
+  /** Subtotal before tax and shipping, in cents. */
+  subtotalCents: Money;
   currency: string;
 }
 
@@ -129,18 +173,30 @@ export type OrderStatus =
   | 'cancelled'
   | 'refunded';
 
+export interface OrderItem {
+  id: UUID;
+  orderId: UUID;
+  productId: UUID | null;
+  variantId: UUID | null;
+  productName: string;
+  variantName: string;
+  unitPriceCents: Money;
+  quantity: number;
+}
+
 export interface Order {
   id: UUID;
   userId: UUID;
-  items: CartItem[];
   status: OrderStatus;
-  subtotal: Money;
-  shipping: Money;
-  tax: Money;
-  total: Money;
+  subtotalCents: Money;
+  shippingCents: Money;
+  taxCents: Money;
+  totalCents: Money;
   currency: string;
-  shippingAddress: Address;
+  shippingAddress: Address | null;
+  items: OrderItem[];
   createdAt: ISODateString;
+  updatedAt: ISODateString;
 }
 
 export interface UserProfile {
@@ -148,16 +204,29 @@ export interface UserProfile {
   email: string;
   firstName: string | null;
   lastName: string | null;
+  role: UserRole;
   avatarUrl: string | null;
-  /** Saved face measurements for AR/AI try-on, in mm. */
-  faceProfile: FaceProfile | null;
   createdAt: ISODateString;
+  updatedAt: ISODateString;
 }
 
 export interface FaceProfile {
   pupillaryDistanceMm: number;
   faceWidthMm: number;
   templeLengthMm: number;
+}
+
+export interface CustomerPreferences {
+  id: UUID;
+  userId: UUID;
+  stylePrompt: string | null;
+  budgetCents: Money | null;
+  faceProfile: FaceProfile | null;
+  preferredShapes: string[];
+  preferredMaterials: string[];
+  preferredColors: string[];
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
 }
 
 /* ------------------------------------------------------------------ */

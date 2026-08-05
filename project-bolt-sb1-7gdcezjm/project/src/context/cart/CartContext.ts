@@ -3,7 +3,7 @@ import type { Cart, CartItem } from '@/types';
 
 export interface CartContextValue {
   items: CartItem[];
-  subtotal: number;
+  subtotalCents: number;
   count: number;
   addItem: (item: CartItem) => void;
   updateQuantity: (variantId: string, quantity: number) => void;

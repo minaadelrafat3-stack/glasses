@@ -1,6 +1,16 @@
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { ApiError } from '@/types';
-import type { Product, ProductImage, ProductVariant, Category } from '@/types';
+import type {
+  Product,
+  ProductImage,
+  ProductVariant,
+  Category,
+  Brand,
+  Color,
+  FrameShapeOption,
+  MaterialOption,
+  SizeOption,
+} from '@/types';
 
 /**
  * Product service — all catalog reads go through here.
@@ -12,10 +22,12 @@ import type { Product, ProductImage, ProductVariant, Category } from '@/types';
 
 export interface ProductQuery {
   categorySlug?: string;
-  shape?: Product['shape'];
-  gender?: Product['gender'];
-  lensType?: Product['lensType'];
+  shapes?: string[];
+  materials?: string[];
+  genders?: string[];
+  lensTypes?: string[];
   search?: string;
+  onSale?: boolean;
   sort?: 'newest' | 'price-asc' | 'price-desc' | 'rating';
   page?: number;
   pageSize?: number;
@@ -28,54 +40,94 @@ export interface ProductListResult {
   pageSize: number;
 }
 
-/** Row shape returned by the `products_with_relations` view (future). */
 interface ProductRow {
   id: string;
   slug: string;
   name: string;
-  brand: string;
-  description: string;
-  shape: Product['shape'];
-  material: Product['material'];
-  gender: Product['gender'];
-  lens_type: Product['lensType'];
-  price: number;
-  compare_at_price: number | null;
-  status: Product['status'];
+  brand_id: string | null;
+  description: string | null;
+  shape_id: string | null;
+  material_id: string | null;
+  gender: string;
+  lens_type: string;
+  price_cents: number;
+  compare_at_price_cents: number | null;
+  status: string;
   rating: number | null;
   review_count: number;
-  category_ids: string[];
   created_at: string;
   updated_at: string;
-  images: ProductImage[];
-  variants: ProductVariant[];
+  brand: { slug: string; name: string } | null;
+  shape: { slug: string; name: string } | null;
+  material: { slug: string; name: string } | null;
+  images: { id: string; url: string; alt_text: string | null; position: number; is_ai_generated: boolean }[];
+  variants: {
+    id: string;
+    color_id: string | null;
+    size_id: string | null;
+    name: string;
+    lens_tint: string | null;
+    price_cents: number;
+    stock: number;
+    sku: string;
+  }[];
+  product_categories: { category_id: string }[];
 }
 
-function mapRow(row: ProductRow): Product {
+const PAGE_SIZE = 24;
+
+function mapRow(row: ProductRow, categorySlugById: Map<string, string>): Product {
+  const categorySlugs = row.product_categories
+    .map((pc) => categorySlugById.get(pc.category_id))
+    .filter(Boolean) as string[];
+
   return {
     id: row.id,
     slug: row.slug,
     name: row.name,
-    brand: row.brand,
+    brandId: row.brand_id,
+    brandName: row.brand?.name ?? null,
     description: row.description,
-    shape: row.shape,
-    material: row.material,
-    gender: row.gender,
-    lensType: row.lens_type,
-    price: row.price,
-    compareAtPrice: row.compare_at_price,
-    status: row.status,
-    rating: row.rating,
+    shapeId: row.shape_id,
+    shape: (row.shape?.slug as Product['shape']) ?? null,
+    materialId: row.material_id,
+    material: (row.material?.slug as Product['material']) ?? null,
+    gender: row.gender as Product['gender'],
+    lensType: row.lens_type as Product['lensType'],
+    priceCents: row.price_cents,
+    compareAtPriceCents: row.compare_at_price_cents,
+    status: row.status as Product['status'],
+    rating: row.rating !== null ? Number(row.rating) : null,
     reviewCount: row.review_count,
-    categoryIds: row.category_ids,
-    images: row.images,
-    variants: row.variants,
+    categorySlugs,
+    images: (row.images ?? []).map((img) => ({
+      id: img.id,
+      productId: row.id,
+      url: img.url,
+      altText: img.alt_text,
+      position: img.position,
+      isAiGenerated: img.is_ai_generated,
+    })),
+    variants: (row.variants ?? []).map((v) => ({
+      id: v.id,
+      productId: row.id,
+      colorId: v.color_id,
+      sizeId: v.size_id,
+      name: v.name,
+      lensTint: v.lens_tint,
+      priceCents: v.price_cents,
+      stock: v.stock,
+      sku: v.sku,
+    })),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
-const PAGE_SIZE = 24;
+async function loadCategoryMap(): Promise<Map<string, string>> {
+  const { data } = await supabase.from('categories').select('id, slug');
+  return new Map((data ?? []).map((c) => [c.id, c.slug]));
+}
 
 export async function fetchProducts(query: ProductQuery = {}): Promise<ProductListResult> {
   if (!isSupabaseConfigured) {
@@ -89,25 +141,46 @@ export async function fetchProducts(query: ProductQuery = {}): Promise<ProductLi
 
   let req = supabase
     .from('products')
-    .select('*, images:product_images(*), variants:product_variants(*)', { count: 'exact' })
+    .select(
+      `*, brand:brands(slug, name), shape:frame_shapes(slug, name),
+      material:materials(slug, name),
+      images:product_images(*), variants:product_variants(*),
+      product_categories(category_id)`,
+      { count: 'exact' },
+    )
     .eq('status', 'active');
 
   if (query.categorySlug) {
-    req = req.eq('category_slug', query.categorySlug);
+    const { data: cat } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('slug', query.categorySlug)
+      .maybeSingle();
+    if (cat) {
+      const { data: links } = await supabase
+        .from('product_categories')
+        .select('product_id')
+        .eq('category_id', cat.id);
+      const productIds = (links ?? []).map((l) => l.product_id);
+      req = req.in('id', productIds.length ? productIds : ['00000000-0000-0000-0000-000000000000']);
+    }
   }
-  if (query.shape) req = req.eq('shape', query.shape);
-  if (query.gender) req = req.eq('gender', query.gender);
-  if (query.lensType) req = req.eq('lens_type', query.lensType);
+
+  if (query.shapes?.length) req = req.in('shape_id', await idsForSlugs('frame_shapes', query.shapes));
+  if (query.materials?.length) req = req.in('material_id', await idsForSlugs('materials', query.materials));
+  if (query.genders?.length) req = req.in('gender', query.genders);
+  if (query.lensTypes?.length) req = req.in('lens_type', query.lensTypes);
+  if (query.onSale) req = req.not('compare_at_price_cents', 'is', null);
   if (query.search) {
-    req = req.or(`name.ilike.%${query.search}%,brand.ilike.%${query.search}%`);
+    req = req.or(`name.ilike.%${query.search}%,description.ilike.%${query.search}%`);
   }
 
   switch (query.sort) {
     case 'price-asc':
-      req = req.order('price', { ascending: true });
+      req = req.order('price_cents', { ascending: true });
       break;
     case 'price-desc':
-      req = req.order('price', { ascending: false });
+      req = req.order('price_cents', { ascending: false });
       break;
     case 'rating':
       req = req.order('rating', { ascending: false, nullsFirst: false });
@@ -120,12 +193,16 @@ export async function fetchProducts(query: ProductQuery = {}): Promise<ProductLi
 
   const { data, error, count } = await req;
 
-  if (error) {
-    throw new ApiError(error.message, 500, error.code);
-  }
+  if (error) throw new ApiError(error.message, 500, error.code);
 
-  const items = (data ?? []).map((row) => mapRow(row as unknown as ProductRow));
+  const categoryMap = await loadCategoryMap();
+  const items = (data ?? []).map((row) => mapRow(row as unknown as ProductRow, categoryMap));
   return { items, total: count ?? 0, page, pageSize };
+}
+
+async function idsForSlugs(table: string, slugs: string[]): Promise<string[]> {
+  const { data } = await supabase.from(table).select('id').in('slug', slugs);
+  return (data ?? []).map((r) => r.id);
 }
 
 export async function fetchProductBySlug(slug: string): Promise<Product | null> {
@@ -133,14 +210,21 @@ export async function fetchProductBySlug(slug: string): Promise<Product | null> 
 
   const { data, error } = await supabase
     .from('products')
-    .select('*, images:product_images(*), variants:product_variants(*)')
+    .select(
+      `*, brand:brands(slug, name), shape:frame_shapes(slug, name),
+      material:materials(slug, name),
+      images:product_images(*), variants:product_variants(*),
+      product_categories(category_id)`,
+    )
     .eq('slug', slug)
     .eq('status', 'active')
     .maybeSingle();
 
   if (error) throw new ApiError(error.message, 500, error.code);
   if (!data) return null;
-  return mapRow(data as unknown as ProductRow);
+
+  const categoryMap = await loadCategoryMap();
+  return mapRow(data as unknown as ProductRow, categoryMap);
 }
 
 export async function fetchCategories(): Promise<Category[]> {
@@ -152,5 +236,40 @@ export async function fetchCategories(): Promise<Category[]> {
     .order('name', { ascending: true });
 
   if (error) throw new ApiError(error.message, 500, error.code);
-  return (data ?? []) as Category[];
+  return (data ?? []) as unknown as Category[];
+}
+
+export async function fetchBrands(): Promise<Brand[]> {
+  if (!isSupabaseConfigured) return [];
+  const { data, error } = await supabase.from('brands').select('*').order('name');
+  if (error) throw new ApiError(error.message, 500, error.code);
+  return (data ?? []) as unknown as Brand[];
+}
+
+export async function fetchColors(): Promise<Color[]> {
+  if (!isSupabaseConfigured) return [];
+  const { data, error } = await supabase.from('colors').select('*').order('name');
+  if (error) throw new ApiError(error.message, 500, error.code);
+  return (data ?? []) as unknown as Color[];
+}
+
+export async function fetchFrameShapes(): Promise<FrameShapeOption[]> {
+  if (!isSupabaseConfigured) return [];
+  const { data, error } = await supabase.from('frame_shapes').select('*').order('name');
+  if (error) throw new ApiError(error.message, 500, error.code);
+  return (data ?? []) as unknown as FrameShapeOption[];
+}
+
+export async function fetchMaterials(): Promise<MaterialOption[]> {
+  if (!isSupabaseConfigured) return [];
+  const { data, error } = await supabase.from('materials').select('*').order('name');
+  if (error) throw new ApiError(error.message, 500, error.code);
+  return (data ?? []) as unknown as MaterialOption[];
+}
+
+export async function fetchSizes(): Promise<SizeOption[]> {
+  if (!isSupabaseConfigured) return [];
+  const { data, error } = await supabase.from('sizes').select('*').order('size_mm');
+  if (error) throw new ApiError(error.message, 500, error.code);
+  return (data ?? []) as unknown as SizeOption[];
 }

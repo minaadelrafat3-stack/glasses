@@ -8,8 +8,8 @@ import { AuthContext, type AuthContextValue } from './AuthContext';
  * AuthProvider — wires Supabase email/password auth into React context.
  *
  * The hook is auth-library agnostic from the consumer's perspective: it
- * exposes `user`, `profile`, `signIn`, `signUp`, `signOut`, and `loading`.
- * Swapping the backend later only changes this file.
+ * exposes `user`, `profile`, `signIn`, `signUp`, `signOut`, `updateProfile`,
+ * and `loading`. Swapping the backend later only changes this file.
  *
  * Email confirmation stays off (per project convention), so signUp yields
  * a usable session immediately.
@@ -17,6 +17,30 @@ import { AuthContext, type AuthContextValue } from './AuthContext';
 
 interface AuthProviderProps {
   children: React.ReactNode;
+}
+
+interface ProfileRow {
+  id: string;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  role: string;
+  avatar_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+function mapProfile(row: ProfileRow): UserProfile {
+  return {
+    id: row.id,
+    email: row.email,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    role: row.role as UserProfile['role'],
+    avatarUrl: row.avatar_url,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
@@ -68,7 +92,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       .maybeSingle()
       .then(({ data }) => {
         if (!active) return;
-        if (data) setProfile(data as unknown as UserProfile);
+        if (data) setProfile(mapProfile(data as unknown as ProfileRow));
       });
 
     return () => {
@@ -76,10 +100,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
   }, [user]);
 
-  const signUp = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({ email, password });
-    if (error) throw error;
-  }, []);
+  const signUp = useCallback(
+    async (email: string, password: string, firstName?: string, lastName?: string) => {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { first_name: firstName ?? '', last_name: lastName ?? '' } },
+      });
+      if (error) throw error;
+
+      // The trigger creates a bare profile row; update names if we have a session.
+      if (data.user) {
+        await supabase
+          .from('profiles')
+          .update({ first_name: firstName ?? null, last_name: lastName ?? null })
+          .eq('id', data.user.id);
+      }
+    },
+    [],
+  );
 
   const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -92,6 +131,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setProfile(null);
   }, []);
 
+  const updateProfile = useCallback(
+    async (updates: Partial<Pick<UserProfile, 'firstName' | 'lastName' | 'avatarUrl'>>) => {
+      if (!user) throw new Error('Not signed in');
+      const row: Record<string, unknown> = {};
+      if (updates.firstName !== undefined) row.first_name = updates.firstName;
+      if (updates.lastName !== undefined) row.last_name = updates.lastName;
+      if (updates.avatarUrl !== undefined) row.avatar_url = updates.avatarUrl;
+
+      const { error } = await supabase.from('profiles').update(row).eq('id', user.id);
+      if (error) throw error;
+
+      setProfile((prev) => (prev ? { ...prev, ...updates } : prev));
+    },
+    [user],
+  );
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -102,8 +157,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       signIn,
       signUp,
       signOut,
+      updateProfile,
     }),
-    [user, profile, session, loading, signIn, signUp, signOut],
+    [user, profile, session, loading, signIn, signUp, signOut, updateProfile],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

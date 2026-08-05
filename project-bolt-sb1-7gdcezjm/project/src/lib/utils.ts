@@ -1,11 +1,18 @@
 /**
- * Format a money amount (in major currency units) for display.
+ * Format a money amount for display. Accepts integer cents by default
+ * (matching the database storage), or major units when `fromCents` is false.
  */
-export function formatMoney(amount: number, currency = 'USD', locale = 'en-US'): string {
+export function formatMoney(
+  amount: number,
+  currency = 'USD',
+  locale = 'en-US',
+  fromCents = true,
+): string {
+  const value = fromCents ? amount / 100 : amount;
   return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency,
-  }).format(amount);
+  }).format(value);
 }
 
 /**

@@ -1,10 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { SlidersHorizontal, ChevronDown } from 'lucide-react';
 import { ProductCard, ProductFilters, defaultFilters } from '@/components/shared';
 import type { FilterState, SortOption } from '@/components/shared';
-import { products, getCategoryBySlug, getProductsByCategory } from '@/data/catalog';
+import { fetchProducts } from '@/services/productService';
+import { getCategoryBySlug } from '@/data/catalog';
 import { cx } from '@/lib/utils';
+import type { Product } from '@/types';
 
 const sortOptions: { value: SortOption; label: string }[] = [
   { value: 'newest', label: 'Newest' },
@@ -18,41 +20,40 @@ export function ShopPage() {
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const category = categorySlug ? getCategoryBySlug(categorySlug) : undefined;
-  const baseProducts = categorySlug ? getProductsByCategory(categorySlug) : products;
 
-  const filtered = useMemo(() => {
-    let result = [...baseProducts];
-
-    if (filters.shapes.length) result = result.filter((p) => filters.shapes.includes(p.shape));
-    if (filters.materials.length) result = result.filter((p) => filters.materials.includes(p.material));
-    if (filters.genders.length) result = result.filter((p) => filters.genders.includes(p.gender));
-    if (filters.lensTypes.length) result = result.filter((p) => filters.lensTypes.includes(p.lensType));
-    if (filters.onSale) result = result.filter((p) => p.compareAtPrice !== null);
-
-    switch (filters.sort) {
-      case 'price-asc':
-        result.sort((a, b) => a.price - b.price);
-        break;
-      case 'price-desc':
-        result.sort((a, b) => b.price - a.price);
-        break;
-      case 'rating':
-        result.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
-        break;
-      default:
-        break;
-    }
-    return result;
-  }, [baseProducts, filters]);
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    fetchProducts({
+      categorySlug,
+      shapes: filters.shapes,
+      materials: filters.materials,
+      genders: filters.genders,
+      lensTypes: filters.lensTypes,
+      onSale: filters.onSale,
+      sort: filters.sort,
+    })
+      .then((result) => {
+        if (active) setProducts(result.items);
+      })
+      .catch(() => {
+        if (active) setProducts([]);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
+  }, [categorySlug, filters]);
 
   const title = category ? category.name : 'All Eyewear';
   const subtitle = category ? category.description : 'Explore our full collection of premium frames.';
 
   return (
     <div className="animate-fade-in">
-      {/* Page header */}
       <div className="border-b border-ink-200 bg-white">
         <div className="container-app py-10 md:py-14">
           <nav className="mb-3 text-sm text-ink-500">
@@ -66,14 +67,12 @@ export function ShopPage() {
 
       <div className="container-app py-8">
         <div className="flex gap-8">
-          {/* Desktop sidebar */}
           <ProductFilters
             filters={filters}
             onChange={setFilters}
             className="w-64 shrink-0"
           />
 
-          {/* Mobile filter trigger */}
           <div className="lg:hidden">
             <button
               onClick={() => setMobileOpen(true)}
@@ -84,7 +83,6 @@ export function ShopPage() {
             </button>
           </div>
 
-          {/* Mobile drawer */}
           <ProductFilters
             filters={filters}
             onChange={setFilters}
@@ -92,12 +90,10 @@ export function ShopPage() {
             onCloseMobile={() => setMobileOpen(false)}
           />
 
-          {/* Product grid */}
           <div className="min-w-0 flex-1">
-            {/* Toolbar */}
             <div className="mb-6 flex items-center justify-between">
               <p className="text-sm text-ink-500">
-                {filtered.length} {filtered.length === 1 ? 'frame' : 'frames'}
+                {loading ? 'Loading…' : `${products.length} ${products.length === 1 ? 'frame' : 'frames'}`}
               </p>
               <div className="relative">
                 <button
@@ -129,9 +125,13 @@ export function ShopPage() {
               </div>
             </div>
 
-            {filtered.length > 0 ? (
+            {loading ? (
+              <div className="flex justify-center py-20">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-ink-300 border-t-primary-600" />
+              </div>
+            ) : products.length > 0 ? (
               <div className="grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-6">
-                {filtered.map((product) => (
+                {products.map((product) => (
                   <ProductCard key={product.id} product={product} />
                 ))}
               </div>

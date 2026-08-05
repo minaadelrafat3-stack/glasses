@@ -4,10 +4,10 @@ import { Badge } from '@/components/ui';
 import { RatingStars } from './RatingStars';
 import { useWishlist } from '@/context';
 import { formatMoney, cx } from '@/lib/utils';
-import type { CatalogProduct } from '@/data/catalog';
+import type { Product } from '@/types';
 
 export interface ProductCardProps {
-  product: CatalogProduct;
+  product: Product;
 }
 
 export function ProductCard({ product }: ProductCardProps) {
@@ -15,7 +15,9 @@ export function ProductCard({ product }: ProductCardProps) {
   const isWishlisted = has(product.id);
   const primaryImage = product.images[0];
   const hoverImage = product.images[1] ?? product.images[0];
-  const onSale = product.compareAtPrice !== null && product.compareAtPrice < product.price;
+  const onSale =
+    product.compareAtPriceCents !== null &&
+    product.compareAtPriceCents < product.priceCents;
 
   return (
     <div className="group relative flex flex-col">
@@ -23,13 +25,13 @@ export function ProductCard({ product }: ProductCardProps) {
         <div className="relative aspect-square overflow-hidden">
           <img
             src={primaryImage.url}
-            alt={primaryImage.altText}
+            alt={primaryImage.altText ?? product.name}
             loading="lazy"
             className="absolute inset-0 h-full w-full object-cover transition-all duration-500 ease-[var(--ease-emphasized)] group-hover:scale-105 group-hover:opacity-0"
           />
           <img
             src={hoverImage.url}
-            alt={hoverImage.altText}
+            alt={hoverImage.altText ?? product.name}
             loading="lazy"
             className="absolute inset-0 h-full w-full object-cover opacity-0 transition-all duration-500 ease-[var(--ease-emphasized)] group-hover:scale-105 group-hover:opacity-100"
           />
@@ -73,7 +75,7 @@ export function ProductCard({ product }: ProductCardProps) {
       <div className="mt-3 flex flex-col gap-1">
         <div className="flex items-center justify-between">
           <span className="text-xs font-medium uppercase tracking-wide text-ink-500">
-            {product.brand}
+            {product.brandName ?? 'Vuera'}
           </span>
           <RatingStars rating={product.rating ?? 0} size={12} />
         </div>
@@ -84,11 +86,11 @@ export function ProductCard({ product }: ProductCardProps) {
         </Link>
         <div className="flex items-center gap-2">
           <span className="text-base font-semibold text-ink-900">
-            {formatMoney(product.price)}
+            {formatMoney(product.priceCents)}
           </span>
           {onSale && (
             <span className="text-sm text-ink-400 line-through">
-              {formatMoney(product.compareAtPrice!)}
+              {formatMoney(product.compareAtPriceCents!)}
             </span>
           )}
         </div>

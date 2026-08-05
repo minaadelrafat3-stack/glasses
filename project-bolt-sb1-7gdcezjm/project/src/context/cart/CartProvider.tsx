@@ -22,7 +22,6 @@ function loadInitial(): CartItem[] {
 export function CartProvider({ children }: CartProviderProps) {
   const [items, setItems] = useState<CartItem[]>(loadInitial);
 
-  // Persist to localStorage whenever items change.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
@@ -60,20 +59,20 @@ export function CartProvider({ children }: CartProviderProps) {
 
   const clear = useCallback(() => setItems([]), []);
 
-  const subtotal = useMemo(
-    () => items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0),
+  const subtotalCents = useMemo(
+    () => items.reduce((sum, i) => sum + i.unitPriceCents * i.quantity, 0),
     [items],
   );
   const count = useMemo(() => items.reduce((sum, i) => sum + i.quantity, 0), [items]);
 
   const cart: Cart = useMemo(
-    () => ({ items, subtotal, currency: CURRENCY }),
-    [items, subtotal],
+    () => ({ items, subtotalCents, currency: CURRENCY }),
+    [items, subtotalCents],
   );
 
   const value = useMemo<CartContextValue>(
-    () => ({ items, subtotal, count, addItem, updateQuantity, removeItem, clear, cart }),
-    [items, subtotal, count, addItem, updateQuantity, removeItem, clear, cart],
+    () => ({ items, subtotalCents, count, addItem, updateQuantity, removeItem, clear, cart }),
+    [items, subtotalCents, count, addItem, updateQuantity, removeItem, clear, cart],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

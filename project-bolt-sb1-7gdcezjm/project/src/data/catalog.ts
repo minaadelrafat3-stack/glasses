@@ -1,216 +1,151 @@
 import type { Product, Category } from '@/types';
 
 /**
- * Static catalog used by the storefront UI. In production these rows come from
- * the `products` / `categories` tables via the service layer; the shapes here
- * match those domain types so swapping to live data is a drop-in change.
+ * Static catalog used as a fallback when the database is unreachable.
+ * In production these rows come from the `products` / `categories` tables
+ * via the service layer. Prices are integer cents.
  */
 
 export const categories: Category[] = [
-  {
-    id: 'cat-optical',
-    slug: 'optical',
-    name: 'Optical',
-    description: 'Prescription frames for everyday clarity.',
-    parentId: null,
-  },
-  {
-    id: 'cat-sunglasses',
-    slug: 'sunglasses',
-    name: 'Sunglasses',
-    description: 'UV-protected shades in timeless silhouettes.',
-    parentId: null,
-  },
-  {
-    id: 'cat-blue-light',
-    slug: 'blue-light',
-    name: 'Blue Light',
-    description: 'Screen-friendly lenses for digital days.',
-    parentId: null,
-  },
-  {
-    id: 'cat-readers',
-    slug: 'readers',
-    name: 'Readers',
-    description: 'Magnifying frames for close-up focus.',
-    parentId: null,
-  },
+  { id: 'cat-optical', slug: 'optical', name: 'Optical', description: 'Prescription frames for everyday clarity.', parentId: null },
+  { id: 'cat-sunglasses', slug: 'sunglasses', name: 'Sunglasses', description: 'UV-protected shades in timeless silhouettes.', parentId: null },
+  { id: 'cat-blue-light', slug: 'blue-light', name: 'Blue Light', description: 'Screen-friendly lenses for digital days.', parentId: null },
+  { id: 'cat-readers', slug: 'readers', name: 'Readers', description: 'Magnifying frames for close-up focus.', parentId: null },
 ];
 
-interface CatalogProduct extends Omit<Product, 'images' | 'variants' | 'categoryIds'> {
-  categorySlugs: string[];
-  images: { id: string; url: string; altText: string; position: number; isAiGenerated: boolean }[];
-  variants: { id: string; name: string; sizeMm: number | null; lensTint: string | null; price: number; stock: number; sku: string }[];
+export type CatalogProduct = Product;
+
+function base(
+  slug: string, name: string, brandName: string, shape: Product['shape'], material: Product['material'],
+  gender: Product['gender'], lensType: Product['lensType'], priceCents: number, compareAtCents: number | null,
+  rating: number | null, reviewCount: number, description: string, categorySlugs: string[],
+  images: Product['images'], variants: Product['variants'],
+): CatalogProduct {
+  return {
+    id: `prod-${slug}`,
+    slug, name, brandId: null, brandName, description,
+    shapeId: null, shape, materialId: null, material,
+    gender, lensType, priceCents, compareAtPriceCents: compareAtCents,
+    status: 'active', rating, reviewCount, categorySlugs,
+    images, variants,
+    createdAt: '2025-01-01T00:00:00Z', updatedAt: '2025-01-01T00:00:00Z',
+  };
 }
 
-const base = (slug: string, name: string, brand: string, shape: Product['shape'], material: Product['material'], gender: Product['gender'], lensType: Product['lensType'], price: number, compareAt: number | null, rating: number | null, reviewCount: number, description: string, categorySlugs: string[], images: CatalogProduct['images'], variants: CatalogProduct['variants']): CatalogProduct => ({
-  id: `prod-${slug}`,
-  slug,
-  name,
-  brand,
-  description,
-  shape,
-  material,
-  gender,
-  lensType,
-  price,
-  compareAtPrice: compareAt,
-  status: 'active',
-  rating,
-  reviewCount,
-  categorySlugs,
-  images,
-  variants,
-  createdAt: '2025-01-01T00:00:00Z',
-  updatedAt: '2025-01-01T00:00:00Z',
-});
+function img(id: string, productId: string, url: string, altText: string, position: number) {
+  return { id, productId, url, altText, position, isAiGenerated: false };
+}
+
+function variant(id: string, productId: string, name: string, priceCents: number, stock: number, sku: string, lensTint: string | null = null) {
+  return { id, productId, colorId: null, sizeId: null, name, lensTint, priceCents, stock, sku };
+}
 
 export const products: CatalogProduct[] = [
-  base(
-    'aurora-cat-eye',
-    'Aurora',
-    'Vuera Studio',
-    'cat-eye', 'acetate', 'women', 'single-vision',
-    189, null, 4.8, 124,
+  base('aurora-cat-eye', 'Aurora', 'Vuera Studio', 'cat-eye', 'acetate', 'women', 'single-vision', 18900, null, 4.8, 124,
     'A sculpted cat-eye frame with a subtle upswept brow line. Hand-polished Italian acetate with stainless steel hinges.',
     ['optical', 'sunglasses'],
     [
-      { id: 'img-aurora-1', url: 'https://images.pexels.com/photos/29811438/pexels-photo-29811438.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', altText: 'Aurora cat-eye frame on silk', position: 0, isAiGenerated: false },
-      { id: 'img-aurora-2', url: 'https://images.pexels.com/photos/26100579/pexels-photo-26100579.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', altText: 'Model wearing Aurora frames', position: 1, isAiGenerated: false },
-      { id: 'img-aurora-3', url: 'https://images.pexels.com/photos/29811437/pexels-photo-29811437.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', altText: 'Aurora frame detail with gold accents', position: 2, isAiGenerated: false },
+      img('img-aurora-1', 'prod-aurora-cat-eye', 'https://images.pexels.com/photos/29811438/pexels-photo-29811438.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', 'Aurora cat-eye frame on silk', 0),
+      img('img-aurora-2', 'prod-aurora-cat-eye', 'https://images.pexels.com/photos/26100579/pexels-photo-26100579.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', 'Model wearing Aurora frames', 1),
+      img('img-aurora-3', 'prod-aurora-cat-eye', 'https://images.pexels.com/photos/29811437/pexels-photo-29811437.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', 'Aurora frame detail with gold accents', 2),
     ],
     [
-      { id: 'var-aurora-1', name: 'Tortoise / 52mm', sizeMm: 52, lensTint: null, price: 189, stock: 18, sku: 'VU-AUR-TT-52' },
-      { id: 'var-aurora-2', name: 'Matte Black / 52mm', sizeMm: 52, lensTint: null, price: 189, stock: 12, sku: 'VU-AUR-BK-52' },
-      { id: 'var-aurora-3', name: 'Crystal / 50mm', sizeMm: 50, lensTint: null, price: 199, stock: 8, sku: 'VU-AUR-CR-50' },
+      variant('var-aurora-1', 'prod-aurora-cat-eye', 'Tortoise / 52mm', 18900, 18, 'VU-AUR-TT-52'),
+      variant('var-aurora-2', 'prod-aurora-cat-eye', 'Matte Black / 52mm', 18900, 12, 'VU-AUR-BK-52'),
+      variant('var-aurora-3', 'prod-aurora-cat-eye', 'Crystal / 50mm', 19900, 8, 'VU-AUR-CR-50'),
     ],
   ),
-  base(
-    'meridian-aviator',
-    'Meridian',
-    'Vuera Studio',
-    'aviator', 'metal', 'unisex', 'sunglasses',
-    219, null, 4.6, 89,
+  base('meridian-aviator', 'Meridian', 'Vuera Studio', 'aviator', 'metal', 'unisex', 'sunglasses', 21900, null, 4.6, 89,
     'A modern take on the classic aviator. Lightweight titanium frame with gradient polarized lenses.',
     ['sunglasses'],
     [
-      { id: 'img-meridian-1', url: 'https://images.pexels.com/photos/16625257/pexels-photo-16625257.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', altText: 'Meridian aviator sunglasses', position: 0, isAiGenerated: false },
-      { id: 'img-meridian-2', url: 'https://images.pexels.com/photos/29271917/pexels-photo-29271917.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', altText: 'Model wearing Meridian sunglasses', position: 1, isAiGenerated: false },
-      { id: 'img-meridian-3', url: 'https://images.pexels.com/photos/14464892/pexels-photo-14464892.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', altText: 'Meridian sunglasses urban setting', position: 2, isAiGenerated: false },
+      img('img-meridian-1', 'prod-meridian-aviator', 'https://images.pexels.com/photos/16625257/pexels-photo-16625257.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', 'Meridian aviator sunglasses', 0),
+      img('img-meridian-2', 'prod-meridian-aviator', 'https://images.pexels.com/photos/29271917/pexels-photo-29271917.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', 'Model wearing Meridian sunglasses', 1),
+      img('img-meridian-3', 'prod-meridian-aviator', 'https://images.pexels.com/photos/14464892/pexels-photo-14464892.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', 'Meridian sunglasses urban setting', 2),
     ],
     [
-      { id: 'var-meridian-1', name: 'Gold / Green Lens', sizeMm: 58, lensTint: 'Green', price: 219, stock: 22, sku: 'VU-MER-GD-GR' },
-      { id: 'var-meridian-2', name: 'Silver / Grey Lens', sizeMm: 58, lensTint: 'Grey', price: 219, stock: 15, sku: 'VU-MER-SV-GY' },
-      { id: 'var-meridian-3', name: 'Black / Smoke Lens', sizeMm: 58, lensTint: 'Smoke', price: 229, stock: 10, sku: 'VU-MER-BK-SM' },
+      variant('var-meridian-1', 'prod-meridian-aviator', 'Gold / Green Lens', 21900, 22, 'VU-MER-GD-GR', 'Green'),
+      variant('var-meridian-2', 'prod-meridian-aviator', 'Silver / Grey Lens', 21900, 15, 'VU-MER-SV-GY', 'Grey'),
+      variant('var-meridian-3', 'prod-meridian-aviator', 'Black / Smoke Lens', 22900, 10, 'VU-MER-BK-SM', 'Smoke'),
     ],
   ),
-  base(
-    'atlas-round',
-    'Atlas',
-    'North Optics',
-    'round', 'acetate', 'unisex', 'single-vision',
-    159, 129, 4.4, 67,
+  base('atlas-round', 'Atlas', 'North Optics', 'round', 'acetate', 'unisex', 'single-vision', 12900, 15900, 4.4, 67,
     'Perfectly round lenses in a chunky acetate frame. A statement piece inspired by 1960s intellectuals.',
     ['optical', 'blue-light'],
     [
-      { id: 'img-atlas-1', url: 'https://images.pexels.com/photos/36310717/pexels-photo-36310717.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', altText: 'Atlas round frame on stand', position: 0, isAiGenerated: false },
-      { id: 'img-atlas-2', url: 'https://images.pexels.com/photos/36713202/pexels-photo-36713202.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', altText: 'Model wearing round Atlas frames', position: 1, isAiGenerated: false },
-      { id: 'img-atlas-3', url: 'https://images.pexels.com/photos/36713201/pexels-photo-36713201.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', altText: 'Atlas frame close-up', position: 2, isAiGenerated: false },
+      img('img-atlas-1', 'prod-atlas-round', 'https://images.pexels.com/photos/36310717/pexels-photo-36310717.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', 'Atlas round frame on stand', 0),
+      img('img-atlas-2', 'prod-atlas-round', 'https://images.pexels.com/photos/36713202/pexels-photo-36713202.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', 'Model wearing round Atlas frames', 1),
+      img('img-atlas-3', 'prod-atlas-round', 'https://images.pexels.com/photos/36713201/pexels-photo-36713201.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', 'Atlas frame close-up', 2),
     ],
     [
-      { id: 'var-atlas-1', name: 'Crystal / 48mm', sizeMm: 48, lensTint: null, price: 129, stock: 30, sku: 'VU-ATL-CR-48' },
-      { id: 'var-atlas-2', name: 'Matte Black / 48mm', sizeMm: 48, lensTint: null, price: 129, stock: 25, sku: 'VU-ATL-BK-48' },
+      variant('var-atlas-1', 'prod-atlas-round', 'Crystal / 48mm', 12900, 30, 'VU-ATL-CR-48'),
+      variant('var-atlas-2', 'prod-atlas-round', 'Matte Black / 48mm', 12900, 25, 'VU-ATL-BK-48'),
     ],
   ),
-  base(
-    'nova-geometric',
-    'Nova',
-    'Vuera Studio',
-    'geometric', 'acetate', 'women', 'single-vision',
-    209, null, 4.9, 156,
+  base('nova-geometric', 'Nova', 'Vuera Studio', 'geometric', 'acetate', 'women', 'single-vision', 20900, null, 4.9, 156,
     'Bold geometric silhouette with sharp angular lines. For those who refuse to blend in.',
     ['optical', 'sunglasses'],
     [
-      { id: 'img-nova-1', url: 'https://images.pexels.com/photos/29301758/pexels-photo-29301758.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', altText: 'Nova geometric sunglasses', position: 0, isAiGenerated: false },
-      { id: 'img-nova-2', url: 'https://images.pexels.com/photos/26100579/pexels-photo-26100579.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', altText: 'Model wearing Nova frames', position: 1, isAiGenerated: false },
-      { id: 'img-nova-3', url: 'https://images.pexels.com/photos/31762856/pexels-photo-31762856.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', altText: 'Nova sunglasses indoor', position: 2, isAiGenerated: false },
+      img('img-nova-1', 'prod-nova-geometric', 'https://images.pexels.com/photos/29301758/pexels-photo-29301758.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', 'Nova geometric sunglasses', 0),
+      img('img-nova-2', 'prod-nova-geometric', 'https://images.pexels.com/photos/26100579/pexels-photo-26100579.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', 'Model wearing Nova frames', 1),
+      img('img-nova-3', 'prod-nova-geometric', 'https://images.pexels.com/photos/31762856/pexels-photo-31762856.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', 'Nova sunglasses indoor', 2),
     ],
     [
-      { id: 'var-nova-1', name: 'Champagne / 53mm', sizeMm: 53, lensTint: null, price: 209, stock: 14, sku: 'VU-NOV-CH-53' },
-      { id: 'var-nova-2', name: 'Onyx / 53mm', sizeMm: 53, lensTint: null, price: 209, stock: 9, sku: 'VU-NOV-ON-53' },
+      variant('var-nova-1', 'prod-nova-geometric', 'Champagne / 53mm', 20900, 14, 'VU-NOV-CH-53'),
+      variant('var-nova-2', 'prod-nova-geometric', 'Onyx / 53mm', 20900, 9, 'VU-NOV-ON-53'),
     ],
   ),
-  base(
-    'horizon-square',
-    'Horizon',
-    'North Optics',
-    'square', 'titanium', 'men', 'single-vision',
-    179, null, 4.5, 92,
+  base('horizon-square', 'Horizon', 'North Optics', 'square', 'titanium', 'men', 'single-vision', 17900, null, 4.5, 92,
     'Architectural square frame in featherlight titanium. Clean lines for a confident, modern look.',
     ['optical', 'blue-light'],
     [
-      { id: 'img-horizon-1', url: 'https://images.pexels.com/photos/19552285/pexels-photo-19552285.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', altText: 'Horizon square frame portrait', position: 0, isAiGenerated: false },
-      { id: 'img-horizon-2', url: 'https://images.pexels.com/photos/1743545/pexels-photo-1743545.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', altText: 'Man wearing Horizon frames', position: 1, isAiGenerated: false },
-      { id: 'img-horizon-3', url: 'https://images.pexels.com/photos/17065258/pexels-photo-17065258.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', altText: 'Horizon frame close-up', position: 2, isAiGenerated: false },
+      img('img-horizon-1', 'prod-horizon-square', 'https://images.pexels.com/photos/19552285/pexels-photo-19552285.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', 'Horizon square frame portrait', 0),
+      img('img-horizon-2', 'prod-horizon-square', 'https://images.pexels.com/photos/1743545/pexels-photo-1743545.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', 'Man wearing Horizon frames', 1),
+      img('img-horizon-3', 'prod-horizon-square', 'https://images.pexels.com/photos/17065258/pexels-photo-17065258.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', 'Horizon frame close-up', 2),
     ],
     [
-      { id: 'var-horizon-1', name: 'Gunmetal / 54mm', sizeMm: 54, lensTint: null, price: 179, stock: 20, sku: 'VU-HOR-GM-54' },
-      { id: 'var-horizon-2', name: 'Matte Black / 54mm', sizeMm: 54, lensTint: null, price: 179, stock: 16, sku: 'VU-HOR-BK-54' },
+      variant('var-horizon-1', 'prod-horizon-square', 'Gunmetal / 54mm', 17900, 20, 'VU-HOR-GM-54'),
+      variant('var-horizon-2', 'prod-horizon-square', 'Matte Black / 54mm', 17900, 16, 'VU-HOR-BK-54'),
     ],
   ),
-  base(
-    'lumina-oval',
-    'Lumina',
-    'Vuera Studio',
-    'oval', 'acetate', 'women', 'single-vision',
-    169, 139, 4.7, 108,
+  base('lumina-oval', 'Lumina', 'Vuera Studio', 'oval', 'acetate', 'women', 'single-vision', 13900, 16900, 4.7, 108,
     'Soft oval frame with a gentle keyhole bridge. Universally flattering and impossibly light.',
     ['optical', 'readers'],
     [
-      { id: 'img-lumina-1', url: 'https://images.pexels.com/photos/8473285/pexels-photo-8473285.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', altText: 'Lumina oval frame still life', position: 0, isAiGenerated: false },
-      { id: 'img-lumina-2', url: 'https://images.pexels.com/photos/7860704/pexels-photo-7860704.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', altText: 'Woman wearing Lumina frames', position: 1, isAiGenerated: false },
-      { id: 'img-lumina-3', url: 'https://images.pexels.com/photos/38453638/pexels-photo-38453638.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', altText: 'Lumina frame profile view', position: 2, isAiGenerated: false },
+      img('img-lumina-1', 'prod-lumina-oval', 'https://images.pexels.com/photos/8473285/pexels-photo-8473285.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', 'Lumina oval frame still life', 0),
+      img('img-lumina-2', 'prod-lumina-oval', 'https://images.pexels.com/photos/7860704/pexels-photo-7860704.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', 'Woman wearing Lumina frames', 1),
+      img('img-lumina-3', 'prod-lumina-oval', 'https://images.pexels.com/photos/38453638/pexels-photo-38453638.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', 'Lumina frame profile view', 2),
     ],
     [
-      { id: 'var-lumina-1', name: 'Rose / 51mm', sizeMm: 51, lensTint: null, price: 139, stock: 28, sku: 'VU-LUM-RS-51' },
-      { id: 'var-lumina-2', name: 'Matte Black / 51mm', sizeMm: 51, lensTint: null, price: 139, stock: 19, sku: 'VU-LUM-BK-51' },
-      { id: 'var-lumina-3', name: 'Tortoise / 51mm', sizeMm: 51, lensTint: null, price: 149, stock: 11, sku: 'VU-LUM-TT-51' },
+      variant('var-lumina-1', 'prod-lumina-oval', 'Rose / 51mm', 13900, 28, 'VU-LUM-RS-51'),
+      variant('var-lumina-2', 'prod-lumina-oval', 'Matte Black / 51mm', 13900, 19, 'VU-LUM-BK-51'),
+      variant('var-lumina-3', 'prod-lumina-oval', 'Tortoise / 51mm', 14900, 11, 'VU-LUM-TT-51'),
     ],
   ),
-  base(
-    'orbit-rectangular',
-    'Orbit',
-    'North Optics',
-    'rectangular', 'metal', 'men', 'single-vision',
-    149, null, 4.3, 54,
+  base('orbit-rectangular', 'Orbit', 'North Optics', 'rectangular', 'metal', 'men', 'single-vision', 14900, null, 4.3, 54,
     'Slim rectangular frame with a brushed metal finish. Understated and endlessly versatile.',
     ['optical', 'blue-light'],
     [
-      { id: 'img-orbit-1', url: 'https://images.pexels.com/photos/16764124/pexels-photo-16764124.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', altText: 'Orbit rectangular frame portrait', position: 0, isAiGenerated: false },
-      { id: 'img-orbit-2', url: 'https://images.pexels.com/photos/14228163/pexels-photo-14228163.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', altText: 'Man adjusting Orbit frames', position: 1, isAiGenerated: false },
-      { id: 'img-orbit-3', url: 'https://images.pexels.com/photos/5914908/pexels-photo-5914908.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', altText: 'Orbit frame outdoor', position: 2, isAiGenerated: false },
+      img('img-orbit-1', 'prod-orbit-rectangular', 'https://images.pexels.com/photos/16764124/pexels-photo-16764124.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', 'Orbit rectangular frame portrait', 0),
+      img('img-orbit-2', 'prod-orbit-rectangular', 'https://images.pexels.com/photos/14228163/pexels-photo-14228163.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', 'Man adjusting Orbit frames', 1),
+      img('img-orbit-3', 'prod-orbit-rectangular', 'https://images.pexels.com/photos/5914908/pexels-photo-5914908.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', 'Orbit frame outdoor', 2),
     ],
     [
-      { id: 'var-orbit-1', name: 'Silver / 55mm', sizeMm: 55, lensTint: null, price: 149, stock: 24, sku: 'VU-ORB-SV-55' },
-      { id: 'var-orbit-2', name: 'Black / 55mm', sizeMm: 55, lensTint: null, price: 149, stock: 17, sku: 'VU-ORB-BK-55' },
+      variant('var-orbit-1', 'prod-orbit-rectangular', 'Silver / 55mm', 14900, 24, 'VU-ORB-SV-55'),
+      variant('var-orbit-2', 'prod-orbit-rectangular', 'Black / 55mm', 14900, 17, 'VU-ORB-BK-55'),
     ],
   ),
-  base(
-    'eclipse-aviator',
-    'Eclipse',
-    'Vuera Studio',
-    'aviator', 'metal', 'unisex', 'sunglasses',
-    239, null, 4.8, 73,
+  base('eclipse-aviator', 'Eclipse', 'Vuera Studio', 'aviator', 'metal', 'unisex', 'sunglasses', 23900, null, 4.8, 73,
     'Oversized aviator with a double bridge and mirrored lenses. Maximum coverage, maximum impact.',
     ['sunglasses'],
     [
-      { id: 'img-eclipse-1', url: 'https://images.pexels.com/photos/38523258/pexels-photo-38523258.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', altText: 'Eclipse aviator sunglasses', position: 0, isAiGenerated: false },
-      { id: 'img-eclipse-2', url: 'https://images.pexels.com/photos/18742635/pexels-photo-18742635.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', altText: 'Model wearing Eclipse sunglasses profile', position: 1, isAiGenerated: false },
-      { id: 'img-eclipse-3', url: 'https://images.pexels.com/photos/5891808/pexels-photo-5891808.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', altText: 'Eclipse sunglasses street style', position: 2, isAiGenerated: false },
+      img('img-eclipse-1', 'prod-eclipse-aviator', 'https://images.pexels.com/photos/38523258/pexels-photo-38523258.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', 'Eclipse aviator sunglasses', 0),
+      img('img-eclipse-2', 'prod-eclipse-aviator', 'https://images.pexels.com/photos/18742635/pexels-photo-18742635.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', 'Model wearing Eclipse sunglasses profile', 1),
+      img('img-eclipse-3', 'prod-eclipse-aviator', 'https://images.pexels.com/photos/5891808/pexels-photo-5891808.jpeg?auto=compress&cs=tinysrgb&h=650&w=940', 'Eclipse sunglasses street style', 2),
     ],
     [
-      { id: 'var-eclipse-1', name: 'Gold / Mirror Lens', sizeMm: 60, lensTint: 'Mirror', price: 239, stock: 13, sku: 'VU-ECL-GD-MR' },
-      { id: 'var-eclipse-2', name: 'Black / Smoke Lens', sizeMm: 60, lensTint: 'Smoke', price: 239, stock: 9, sku: 'VU-ECL-BK-SM' },
+      variant('var-eclipse-1', 'prod-eclipse-aviator', 'Gold / Mirror Lens', 23900, 13, 'VU-ECL-GD-MR', 'Mirror'),
+      variant('var-eclipse-2', 'prod-eclipse-aviator', 'Black / Smoke Lens', 23900, 9, 'VU-ECL-BK-SM', 'Smoke'),
     ],
   ),
 ];
@@ -238,5 +173,3 @@ export function getRelatedProducts(slug: string, limit = 4): CatalogProduct[] {
     .filter((p) => p.slug !== slug && p.categorySlugs.some((c) => product.categorySlugs.includes(c)))
     .slice(0, limit);
 }
-
-export type { CatalogProduct };

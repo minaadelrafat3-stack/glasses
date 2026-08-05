@@ -92,8 +92,9 @@ const genderOptions: { value: string; label: string }[] = [
 const lensOptions: { value: string; label: string }[] = [
   { value: 'single-vision', label: 'Optical' },
   { value: 'sunglasses', label: 'Sunglasses' },
-  { value: 'blue-light', label: 'Blue Light' },
+  { value: 'progressive', label: 'Progressive' },
   { value: 'reading', label: 'Readers' },
+  { value: 'non-prescription', label: 'Non-Prescription' },
 ];
 
 export function ProductFilters({ filters, onChange, className, mobileOpen, onCloseMobile }: ProductFiltersProps) {
